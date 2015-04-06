@@ -1,3 +1,4 @@
+Exercise 1: No.1
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,61 +7,295 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+
 int main(void)
+
 {
     pid_t pid1, pid2;
-    int rv;
+    int rv1, rv2;
 
     switch(pid1 = fork())
-      {
-    case -1:
-        perror("fork");  /* something went wrong */
-        exit(1);         /* parent exits */
+    {
+        case -1:
+            perror("fork");
+            exit(1);
 
-    case 0:
-        printf(" CHILD1: This is the child process!\n");
-        printf(" CHILD1: My PID is %d\n", getpid());
-        printf(" CHILD1: My parent's PID is %d\n", getppid());
-        printf(" CHILD1: Enter my exit status (make it small): ");
-        scanf(" %d", &rv);
-        printf(" CHILD1: I'm outta here!\n");
+        case 0:
+            printf(" CHILD1: This is the 1st CHILD process!\n");
+            printf(" CHILD1: My PID is %d\n", getpid());
+            printf(" CHILD1: My parent's PID is %d\n", getppid());
+            printf(" CHILD1: Enter my exit status (and make it small): ");
+            scanf(" %d", &rv1);
+            printf(" CHILD1: I'm outta here!\n");
+            exit(rv1);
 
-    default:
-        printf("PARENT: This is the parent process!\n");
-        printf("PARENT: My PID is %d\n", getpid());
-        printf("PARENT: My 1st child's PID is %d\n", pid1);
-        printf("PARENT: I'm now waiting for my both child to exit()...\n");
-        wait(&rv);
-        printf("PARENT: My child's exit status is: %d\n", WEXITSTATUS(rv));
-        printf("PARENT: I'm outta here!\n");
-
-      }
- switch(pid2 = fork())
-     {
-    case -1:
-        perror("fork");  /* something went wrong */
-        exit(1);         /* parent exits */
-
-    case 0:
-        printf(" CHILD2: This is the child process!\n");
-        printf(" CHILD2: My PID is %d\n", getpid());
-        printf(" CHILD2: My parent's PID is %d\n", getppid());
-        printf(" CHILD2: Enter my exit status (make it small): ");
-        scanf(" %d", &rv);
-        printf(" CHILD2: I'm outta here!\n");
-
-    default:
-        printf("PARENT: This is the parent process!\n");
-        printf("PARENT: My PID is %d\n", getpid());
-        printf("PARENT: My 2nd child's PID is %d\n", pid2);
-        printf("PARENT: I'm now waiting for my both child to exit()...\n");
-        wait(&rv);
-        printf("PARENT: My child's exit status is: %d\n", WEXITSTATUS(rv));
-        printf("PARENT: I'm outta here!\n");
-
+        default:
+            printf("PARENT: This is the parent process.\n");
+            printf("PARENT: My PID is %d\n", getpid());
+            printf("PARENT: My child's PID is %d\n", pid1);
+            printf("PARENT: Waiting for 1st child to exit()...\n");
+            wait(&rv1);
+            printf("PARENT: I'm outta here!\n");
      }
-    return 0;
+
+
+     switch(pid2 = fork())
+     {
+        case -1:
+            perror("fork");
+            exit(1);
+
+        case 0:
+            printf(" CHILD2: This is the 2nd CHILD process!\n");
+            printf(" CHILD2: My PID is %d\n", getpid());
+            printf(" CHILD2: My parent's PID is %d\n", getppid());
+            printf(" CHILD2: Enter my exit status (and make it small): ");
+            scanf(" %d", &rv2);
+            printf(" CHILD2: I'm outta here!\n");
+            exit(rv2);
+
+        default:
+            printf("PARENT: This is the parent process.\n");
+            printf("PARENT: My PID is %d\n", getpid());
+            printf("PARENT: My 2nd child's PID is %d\n", pid2);
+            printf("PARENT: Waiting for 2nd child to exit()...\n");
+            wait(&rv2);
+            printf("PARENT: I'm outta here!\n");
+     }
+
+            printf("PARENT: My 1st child's exit status is: %d\n", WEXITSTATUS(rv1));
+            printf("PARENT: My 2nd child's exit status is: %d\n", WEXITSTATUS(rv2)); 
+        return 0;
 }
 
+
+Exercise 1: No.2
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+
+
+int main(void)
+
+{
+    pid_t pid1, pid2;
+    int rv1, rv2;
+
+    switch(pid1 = fork())
+    {
+        case -1:
+            perror("fork");
+            exit(1);
+
+        case 0:
+            printf(" CHILD1: This is the 1st CHILD process!\n");
+            printf(" CHILD1: My PID is %d\n", getpid());
+            printf(" CHILD1: My parent's PID is %d\n", getppid());
+            printf(" CHILD1: Enter my exit status (and make it small): ");
+            scanf(" %d", &rv1);
+            printf(" CHILD1: I'm outta here!\n");
+            exit(rv1);
+
+        default:
+            printf("PARENT: This is the parent process.\n");
+            printf("PARENT: My PID is %d\n", getpid());
+            printf("PARENT: My 1st child's PID is %d\n", pid1);
+            printf("PARENT: Waiting for 1st child to exit()...\n");
+            wait(&rv1);
+            printf("PARENT: I'm outta here!\n");
+     }
+
+
+     switch(pid2 = fork())
+     {
+        case -1:
+            perror("fork");
+            exit(1);
+
+        case 0:
+            printf(" CHILD2: This is the 2nd CHILD process!\n");
+            printf(" CHILD2: My PID is %d\n", getpid());
+            printf(" CHILD2: My parent's PID is %d\n", getppid());
+            printf(" CHILD2: Enter my exit status (and make it small): ");
+            scanf(" %d", &rv2);
+            printf(" CHILD2: I'm outta here!\n");
+            exit(rv2);
+
+        default:
+            printf("PARENT: This is the parent process.\n");
+            printf("PARENT: My PID is %d\n", getpid());
+            printf("PARENT: My 2nd child's PID is %d\n", pid2);
+            wait(&rv2);
+            printf("PARENT: I'm outta here!\n");
+     }
+
+            printf("PARENT: My 1st child's exit status is: %d\n", WEXITSTATUS(rv1));
+
+        return 0;
+}
+
+
+
+Exercise 2:
+
+#include<stdio.h>
+#include<signal.h>
+#include<unistd.h>
+#include<errno.h>
+
+
+void sig_handler(int signo)
+{
+  if(signo == SIGINT)
+     printf("This is a special signal handler for SIGINT\n");
+  else if(signo == SIGKILL)
+     printf("This is a special signal handler for SIGKILL\n");
+  else if(signo == SIGHUP)
+     printf("This is a special signal handler for SIGHUB\n");
+  else if(signo == SIGTERM)
+     printf("This is a special signal handler for SIGTERM\n");
+}
+
+int main(void)
+{
+  if(signal(SIGINT, sig_handler) == SIG_ERR)
+     printf("\ncan't catch sigint\n");
+
+  if(signal(SIGKILL, sig_handler) == SIG_ERR)
+     printf("\ncan't catch sigkill\n");
+  
+  if(signal(SIGHUP, sig_handler) == SIG_ERR)
+     printf("\ncan't catch sighup\n");
+
+  if(signal(SIGTERM, sig_handler) == SIG_ERR)
+     printf("\ncan't catch sigterm\n");
+
+  while(1);
+  sleep(1);
+
+  return 0;
+}
+
+
+
+Exercise 3:
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<errno.h>
+#include<sys/types.h>
+#include<unistd.h>
+
+int main(void)
+{
+  int pfds1[2], pfds2[2];
+  char buf1[30], buf2[30];
+
+
+  pipe(pfds1);
+
+
+
+  if(!fork())
+    {
+     printf("CHILD1: writing to the pipe\n");
+     printf("please enter your name: ");
+     scanf(" %s", buf1);
+     write(pfds1[1], buf1, 10);
+     printf("CHILD1: exiting\n");
+     exit(0);
+    }
+
+   else
+     {
+      printf("PARENT: reading from pipe\n");
+      read(pfds1[0], buf1, 10);
+      wait(NULL);
+     } 
+
+
+    pipe(pfds2);
  
+  if(!fork())
+    {
+     printf("CHILD2: writing to the pipe\n");
+     printf("please enter your name: ");
+     scanf(" %s", buf2);
+     write(pfds2[1], buf2, 10);
+     printf("CHILD2: exiting\n");
+     exit(0);
+    }
+
+   else
+     {
+      printf("PARENT: reading from pipe\n");
+      read(pfds2[0], buf2, 10);
+      wait(NULL);
+     } 
+
+    printf("PARENT: read from CHILD1:  \"%s\"\n", buf1);
+    printf("PARENT: read from CHILD2:  \"%s\"\n", buf2);
+
+
+ return 0;
+
+}
+  
+  
+Exercise 4:
+
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <stdio.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <string.h>
+#define SHMSIZE 1024 /*make it a 1K shared memory segment*/
+
+int main()
+{
+   int shmid;
+   char *shm;
+
+   if(fork() == 0)
+     {
+      shmid = shmget(2009, SHMSIZE, 0);
+      shm = shmat(shmid, 0, 0);
+      char *s = (char *) shm;
+      *s = '\0';
+
+      char i;
+      for(i=0; i<1; i++)
+         {
+          char n[10];
+          printf("Enter a string (less than 10) :<%i> ", i);
+          scanf("%s", n);
+          sprintf(s, "%s%s", s, n);
+         }
+
+      strcat(s, "\n");
+      printf ("Child: writing into shared memory: <%s>\n",shm);
+      shmdt(shm);
+     }
+
+   else
+     {
+      shmid = shmget(2009, SHMSIZE, 0666 | IPC_CREAT);
+      shm = shmat(shmid, 0, 0);
+      wait(NULL);
+      printf ("Parent: reading from shared memory: <%s>\n",shm) ;
+      shmdt(shm);
+      shmctl(shmid, IPC_RMID, NULL);
+     }
+
+   return 0;
+}
+
+
+
 
