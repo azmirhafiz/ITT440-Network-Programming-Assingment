@@ -1,0 +1,320 @@
+/*STREAM SERVER1*/
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<errno.h>
+#include<string.h>
+#include<sys/types.h>
+#include<sys/socket.h>
+#include<netinet/in.h>
+#include<netdb.h>
+#include<arpa/inet.h>
+#include<sys/wait.h>
+#include<signal.h>
+#include<time.h>
+
+#define PORT "3490"  /* the port users will be connecting to */
+#define BACKLOG 10   /* how many pending connections queue will hold */
+#define MAX_BUFFER 128
+
+void sigchld_handler(int s)
+{
+ while(waitpid(-1, NULL, WNOHANG) > 0);
+}
+
+//get sockaddr, ipv4 or ipv6
+void *get_in_addr(struct sockaddr *sa)
+{
+ if(sa->sa_family == AF_INET)
+   {
+    return &(((struct sockaddr_in*)sa)->sin_addr);
+   }
+
+   return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
+int main(void)
+{
+ int sock_fd, new_fd;  //listen on sock_fd, new connection on new_fd
+ struct addrinfo hints, *servinfo, *p;
+ struct sockaddr_storage their_addr;  //connector's address information
+ socklen_t sin_size;
+ struct sigaction sa;
+ int yes=1;
+ char s[INET6_ADDRSTRLEN];
+ int rv, sizecmd;
+ char clientinp[100];
+ char timebuffer[MAX_BUFFER+1];
+ time_t currenTime;
+ char clientcmd[100];
+ char *operator, *valA, *valB, *ptr;
+ int a, b, total;
+
+ memset(&hints, 0, sizeof hints);
+ hints.ai_family = AF_UNSPEC;
+ hints.ai_socktype = SOCK_STREAM;
+ hints.ai_flags = AI_PASSIVE; //use myIP
+
+
+ if((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0)
+   {
+    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+    return 1;
+   }
+
+ //loop through all the results and bind to the first we can
+ for(p = servinfo; p != NULL; p = p->ai_next)
+    {
+     if((sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
+       {
+        perror("server: socket");
+        continue;
+       }
+
+     if(setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
+       {
+        perror("setsockopt");
+        exit(1);
+       }
+
+     if(bind(sock_fd, p->ai_addr, p->ai_addrlen) == -1)
+       {
+        close(sock_fd);
+        perror("server: bind");
+        continue;
+       }
+
+    break;
+   }
+
+ if(p == NULL)
+   {
+    fprintf(stderr, "server: failed to bind\n");
+    return 2;
+   }
+
+ freeaddrinfo(servinfo); //all done with this structure
+
+ if(listen(sock_fd, BACKLOG) == -1)
+   {
+    perror("listen");
+    exit(1);
+   }
+
+   sa.sa_handler = sigchld_handler; //reap all dead process
+   sigemptyset(&sa.sa_mask);
+   sa.sa_flags = SA_RESTART;
+
+   if(sigaction(SIGCHLD, &sa, NULL) == -1)
+     {
+      perror("sigaction");
+      exit(1);
+     }
+
+   printf("server: waiting for connection...\n");
+
+   while(1)   //main accept() loop
+    {
+     sin_size = sizeof their_addr;
+     new_fd = accept(sock_fd, (struct sockaddr *)&their_addr, &sin_size);
+
+     if(new_fd == -1)
+       {
+        perror("accept");
+        continue;
+       }
+
+     inet_ntop(their_addr.ss_family, get_in_addr((struct sockaddr *)&their_addr),s, sizeof s);
+     printf("server: got connection from %s\n", s);
+
+     currenTime = time(NULL);
+     snprintf(timebuffer, MAX_BUFFER, "%s\n", ctime(&currenTime));
+     write(new_fd, timebuffer, strlen(timebuffer));
+
+     sizecmd = recv(new_fd,clientcmd, 100, 0);
+     operator = strtok_r(clientcmd, " ", &ptr);
+     valA = strtok_r(NULL, " ", &ptr);
+     valB = strtok_r(NULL, " ", &ptr); 
+
+     a = atoi(valA);
+     b = atoi(valB);
+
+     if(strcmp(operator, "ADD") == 0)
+       {
+        total = a + b;
+       }
+
+     else if(strcmp(operator, "SUB") == 0)
+       {
+        total = a - b;
+       }
+
+     else
+       {
+        printf("Sorry try again");
+       }
+
+     sprintf(clientcmd, "%d", total);
+     write(new_fd, clientcmd, strlen(clientcmd));
+
+
+     while(1) //loop for server respond to client everytime client make request
+       {
+        bzero(clientinp, 100);
+        read(new_fd, clientinp, 100);
+        printf("Server reply: %s", clientinp);
+        write(new_fd, clientinp, strlen(clientinp)+1);
+       }
+    }
+
+  close(new_fd);  //parent doesn't need this
+
+  return 0;
+}
+
+
+
+
+/*STREAM CLIENT1*/
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<errno.h>
+#include<string.h>
+#include<netdb.h>
+#include<sys/types.h>
+#include<netinet/in.h>
+#include<sys/socket.h>
+#include<arpa/inet.h>
+#include<sys/wait.h>
+#include<signal.h>
+#include<time.h>
+
+#define PORT "3490"  //the port client will connecting to
+#define MAXDATASIZE 100  //max number of bytes we can get at once
+#define MAX_BUFFER 128 
+
+//get sockaddr, ipv4 or ipv6
+void *get_in_addr(struct sockaddr *sa)
+ {
+  if(sa->sa_family == AF_INET)
+    {
+     return &(((struct sockaddr_in*)sa)->sin_addr);
+    }
+
+   return &(((struct sockaddr_in6*)sa)->sin6_addr);
+ }
+
+ int main(int argc, char *argv[])
+  {
+   int sock_fd, numbytes, in;
+   char buf[MAXDATASIZE];
+   struct addrinfo hints, *servinfo, *p;
+   int rv, first, second;
+   char s[INET6_ADDRSTRLEN];
+   char userinput[100];
+   char serverreply[100];
+   char clientinput;
+   char timebuffer[MAX_BUFFER+1];
+   char command[100], result[100];
+
+   if(argc != 2)
+     {
+      fprintf(stderr,"usage: client hostname\n");
+      exit(1);
+     }
+
+   memset(&hints, 0, sizeof hints);
+   hints.ai_family = AF_UNSPEC;
+   hints.ai_socktype = SOCK_STREAM;
+
+   if((rv = getaddrinfo(argv[1], PORT, &hints, &servinfo)) != 0)
+     {
+      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+      return 1;
+     }
+
+   //loop through all results and connect to the first we can
+   for(p = servinfo; p != NULL; p = p->ai_next)
+      {
+       if((sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
+         {
+          perror("client: socket");
+          continue;
+         }
+
+       if(connect(sock_fd, p->ai_addr, p->ai_addrlen) == -1)
+         {
+          close(sock_fd);
+          perror("client: connect");
+          continue;
+         }
+
+    break;
+      }
+
+   if(p == NULL)
+     {
+      fprintf(stderr, "client: failed to connect\n");
+      return 2;
+     }
+
+   inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr), s, sizeof s);
+   printf("client: connecting to %s\n", s);
+
+   freeaddrinfo(servinfo);  //all done with this structure
+
+   while((in = read(sock_fd, timebuffer, MAX_BUFFER)) > 0)
+    {
+     timebuffer[in] = 0;
+     printf("\nThe current time is: %s", timebuffer);
+
+//     scanf("%s", command);
+     printf("Client: ");
+     gets(command);
+     send(sock_fd, command, strlen(command), 0);
+     recv(sock_fd, result, 100, 0);
+     printf("server: %s ", result);
+
+     while(1)
+      {
+
+       bzero(userinput, 100);
+       bzero(serverreply, 100);
+
+       printf("\nClient request: %s", userinput);
+       fgets(userinput, 100, stdin);
+       write( sock_fd, userinput, strlen(userinput)+1);
+       read(sock_fd, serverreply, 100);
+       printf("Server reply: %s", serverreply);
+
+       continue;
+       }
+     }
+
+   close(sock_fd);
+
+   return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
