@@ -1,0 +1,398 @@
+Example 1 : Test Client
+
+#include<stdio.h>
+#include<sys/types.h>
+#include<sys/socket.h>
+#include<netinet/in.h>
+#include<string.h>
+
+void child_func(int childnum);
+
+int main(int argc, char *argv[])
+  {
+   int nchildren = 1;
+   int pid;
+   int x;
+
+   if(argc > 1)
+     {
+      nchildren = atoi(argv[1]);
+     }
+
+   for(x = 0; x < nchildren; x++)
+      {
+       if((pid = fork() == 0))
+         {
+          child_func(x+1);
+          exit(0);
+         }
+      }
+
+   wait(NULL);
+   return 0;
+  }
+
+void child_func(int childnum)
+   {
+    int sock;
+    struct sockaddr_in sAddr;
+    char buffer[25];
+
+    memset((void *)&sAddr, 0, sizeof(struct sockaddr_in));
+
+    sAddr.sin_family = AF_INET;
+    sAddr.sin_addr.s_addr = INADDR_ANY;
+    sAddr.sin_port = 0;
+
+    sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    bind(sock, (const struct sockaddr *)&sAddr, sizeof(sAddr));
+
+    sAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    sAddr.sin_port = htons(1972);
+
+    if(connect( sock, (const struct sockaddr *)&sAddr, sizeof(sAddr)) != 0)
+      {
+       perror("client");
+       return;
+      }
+
+    snprintf(buffer, 128, "Data from client #%i.", childnum);
+    sleep(1);
+    printf("child #%i sent %i chars \n", childnum, send(sock, buffer, strlen(buffer), 0));
+    sleep(1);
+    printf("child #%i sent %i chars \n", childnum, recv(sock, buffer, 25, 0));
+
+    sleep(1);
+    close(sock);
+   }
+
+
+Example 2 : Multiplexing Server Using Select()
+
+#include<stdio.h>
+#include<sys/ioctl.h>
+#include<sys/types.h>
+#include<sys/socket.h>
+#include<netinet/in.h>
+
+int main(int argc, char *argv[])
+  {
+   struct sockaddr_in saddr;
+   fd_set readset, testset;
+   int listensock;
+   int newsock;
+   char buffer[25];
+   int result;
+   int nread;
+   int x;
+   int val;
+
+   listensock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+   val = 1;
+   result = setsockopt(listensock, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+
+   if(result < 0)
+     {
+      perror("error setting socket option");
+      return 0;
+     }
+
+   saddr.sin_family = AF_INET;
+   saddr.sin_port = htons(1972);
+   saddr.sin_addr.s_addr = INADDR_ANY;
+
+   result = bind(listensock, (struct sockaddr *)&saddr, sizeof(saddr));
+   if(result < 0)
+     {
+      perror("error bind socket");
+      return 0;
+     }
+
+   result = listen(listensock, 5);
+   if(result < 0)
+     {
+      perror("error listen socket");
+      return 0;
+     }
+
+   FD_ZERO(&readset);
+   FD_SET(listensock, &readset);
+
+   while(1)
+    {
+     testset = readset;
+     result = select(FD_SETSIZE, &testset, NULL, NULL, NULL);
+     if(result < 1)
+       {
+        perror("error select()");
+        return 0;
+       }
+
+     for(x = 0; x < FD_SETSIZE; x++)
+        {
+         if(FD_ISSET(x, &testset))
+           {
+            if(x == listensock)
+              {
+               newsock = accept(listensock, NULL, NULL);
+               FD_SET(newsock, &readset);
+              }
+
+            else
+              {
+               nread = recv(x, buffer, 25, 0);
+
+               if(nread <= 0)
+                 {
+                  close(x);
+                  FD_CLR(x, &readset);
+                  printf("client on descriptor #%i disconnected\n", x);
+                 }
+
+               else
+                 {
+                  buffer[nread] = '\0';
+                  printf("%s\n", buffer);
+                  send(x, buffer, nread, 0);
+                 }
+              }
+           }
+        }
+     }
+  }
+
+
+Example 3 : One Child Per Client Server
+
+#include<stdio.h>
+#include<sys/ioctl.h>
+#include<sys/types.h>
+#include<sys/socket.h>
+#include<netinet/in.h>
+#include<sys/wait.h>
+#include<signal.h>
+
+void sigchld_handler(int signo)
+  {
+   while(waitpid(-1,NULL,WNOHANG)>0);
+  }
+
+int main(int argc, char *argv[])
+  {
+   struct sockaddr_in saddr;
+   int listensock;
+   int newsock;
+   char buffer[25];
+   int result;
+   int nread;
+   int pid;
+   int val;
+
+   listensock=socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
+
+   val=1;
+   result=setsockopt(listensock,SOL_SOCKET,SO_REUSEADDR,&val,sizeof(val));
+
+   if(result<0)
+     {
+      perror("Error setting socket option");
+      return 0;
+     }
+
+   saddr.sin_family=AF_INET;
+   saddr.sin_port=htons(1972);
+   saddr.sin_addr.s_addr=INADDR_ANY;
+
+   result=bind(listensock,(struct sockaddr *)&saddr,sizeof(saddr));
+   if(result<0)
+     {
+      perror("error bind socket");
+      return 0;
+     }
+
+   result=listen(listensock,5);
+   if(result<0)
+     {
+      perror("error listen socket");
+      return 0;
+     }
+
+   signal(SIGCHLD,sigchld_handler);
+
+   while(1)
+     {
+      newsock=accept(listensock,NULL,NULL);
+
+      if((pid = fork()) == 0)
+        {
+         printf("child process %i created\n",getpid());
+         close(listensock);
+
+         nread=recv(newsock,buffer,25,0);
+         buffer[nread]='\0';
+
+         printf("%s\n",buffer);
+
+         send(newsock,buffer,nread,0);
+         close(newsock);
+
+         printf("child process %i finished\n",getpid());
+         exit(0);
+        }
+      close(newsock);
+     }
+   }
+
+
+Example 4 : Pre-Fork Server
+
+#include<stdio.h>
+#include<sys/ioctl.h>
+#include<sys/types.h>
+#include<sys/socket.h>
+#include<netinet/in.h>
+
+int main(int argc, char *argv[])
+  {
+   struct sockaddr_in saddr;
+   int listensock;
+   int newsock;
+   char buffer[25];
+   int result;
+   int nread;
+   int pid;
+   int nchildren=1;
+   int x;
+   int val;
+
+   if(argc>1)
+     {
+      nchildren=atoi(argv[1]);
+     }
+
+   listensock=socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
+
+   val=1;
+   result=setsockopt(listensock,SOL_SOCKET,SO_REUSEADDR,&val,sizeof(val));
+
+   if(result<0)
+     {
+      perror("error setting socket option");
+      return 0;
+     }
+
+   saddr.sin_family=AF_INET;
+   saddr.sin_port=htons(1972);
+   saddr.sin_addr.s_addr=INADDR_ANY;
+
+   result=bind(listensock,(struct sockaddr *)&saddr,sizeof(saddr));
+   if(result<0)
+     {
+      perror("error bind socket");
+      return 0;
+     }
+
+   result=listen(listensock,5);
+   if(result<0)
+     {
+      perror("error listen socket");
+      return 0;
+     }
+
+   for(x=0;x<nchildren;x++)
+      {
+       if((pid=fork()) == 0)
+         {
+          while(1)
+            {
+             newsock=accept(listensock,NULL,NULL);
+             printf("client connected to child process %i \n", getpid());
+            }
+         }
+      }
+   wait(NULL);
+ }
+
+
+Example 5 : Thread Server
+
+#include<stdio.h>
+#include<sys/ioctl.h>
+#include<sys/types.h>
+#include<sys/socket.h>
+#include<netinet/in.h>
+#include<pthread.h>
+
+void* thread_proc(void *argc);
+
+int main(int argc, char *argv[])
+   {
+    struct sockaddr_in saddr;
+    int listensock;
+    int newsock;
+    int result;
+    pthread_t thread_id;
+    int val;
+
+    listensock=socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
+
+    val=1;
+    result=setsockopt(listensock,SOL_SOCKET,SO_REUSEADDR,&val,sizeof(val));
+
+    if(result<0)
+      {
+       perror("error setting socket option");
+       return 0;
+      }
+
+    saddr.sin_family=AF_INET;
+    saddr.sin_port=htons(1972);
+    saddr.sin_addr.s_addr=INADDR_ANY;
+
+    result=bind(listensock,(struct sockaddr *)&saddr,sizeof(saddr));
+    if(result<0)
+      {
+       perror("error bind socket");
+       return 0;
+      }
+
+    result=listen(listensock,5);
+    if(result<0)
+      {
+       perror("error listen socket");
+       return 0;
+      }
+
+    while(1)
+      {
+       newsock=accept(listensock,NULL,NULL);
+       result=pthread_create(&thread_id,NULL,thread_proc,(void *) newsock);
+
+       if(result != 0)
+         {
+          printf("could not create thread");
+         }
+
+       pthread_detach(thread_id);
+       sched_yeild();
+      }
+   }
+
+   void* thread_proc(void *arg)
+      {
+       int sock;
+       char buffer[25];
+       int nread;
+
+       printf("child thread %i with pid %i created\n", pthread_self(), getpid());
+
+       sock=(int)arg;
+       nread=recv(sock,buffer,25,0);
+       buffer[nread]='\0';
+       printf("%s\n", buffer);
+       send(sock,buffer,nread,0);
+       close(sock);
+
+       printf("child thread %i with pid %i finished\n", pthread_self(), getpid());
+     }
