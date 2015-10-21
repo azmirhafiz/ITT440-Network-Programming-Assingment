@@ -32,10 +32,9 @@ int main(void)
         default:
             printf("PARENT: This is the parent process.\n");
             printf("PARENT: My PID is %d\n", getpid());
-            printf("PARENT: My child's PID is %d\n", pid1);
+            printf("PARENT: My 1st child's PID is %d\n", pid1);
             printf("PARENT: Waiting for 1st child to exit()...\n");
             wait(&rv1);
-            printf("PARENT: I'm outta here!\n");
      }
 
 
@@ -60,11 +59,12 @@ int main(void)
             printf("PARENT: My 2nd child's PID is %d\n", pid2);
             printf("PARENT: Waiting for 2nd child to exit()...\n");
             wait(&rv2);
-            printf("PARENT: I'm outta here!\n");
      }
-
+     
             printf("PARENT: My 1st child's exit status is: %d\n", WEXITSTATUS(rv1));
             printf("PARENT: My 2nd child's exit status is: %d\n", WEXITSTATUS(rv2)); 
+            printf("PARENT: I'm outta here!\n");
+
         return 0;
 }
 
