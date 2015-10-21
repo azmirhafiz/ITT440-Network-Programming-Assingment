@@ -20,7 +20,7 @@ int main(void)
 
     memset(&servaddr, 0 , sizeof(servaddr));
     servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = htonl(2130706433L);
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(DAYTIME_SERVER_PORT);
 
     bind(serverFd, (struct sockaddr *) &servaddr, sizeof(servaddr));
@@ -67,7 +67,6 @@ int main(void)
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(DAYTIME_SERVER_PORT);
     servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     connect(connectionFd, (struct sockaddr *) &servaddr, sizeof(servaddr));
 
@@ -76,9 +75,10 @@ int main(void)
         timebuffer[in] = 0;
         printf("The current time is:  %s" , timebuffer);
     }
-    
+
     close(connectionFd);
 
 }
+
 
 
